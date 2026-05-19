@@ -32,6 +32,8 @@ def login(session: requests.Session, username: str, password: str) -> bool:
 
 def fetch_items(session: requests.Session) -> list[dict]:
     r = session.get(LIST_URL)
+    print(f"[DEBUG] fetch URL: {r.url}, status: {r.status_code}, len: {len(r.text)}")
+    print(f"[DEBUG] HTML 앞부분: {r.text[:500]}")
     soup = BeautifulSoup(r.text, "html.parser")
 
     # 제목 컬럼이 있는 테이블을 찾음
