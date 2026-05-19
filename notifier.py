@@ -17,6 +17,9 @@ def login(session: requests.Session, username: str, password: str) -> bool:
     if not csrf_input:
         raise RuntimeError("CSRF token not found on login page")
 
+    print(f"[DEBUG] CSRF token: {csrf_input['value']}")
+    print(f"[DEBUG] Session cookies before POST: {dict(session.cookies)}")
+
     resp = session.post(LOGIN_POST, data={
         "loginFlag": "",
         "menuNo": "200025",
@@ -24,9 +27,11 @@ def login(session: requests.Session, username: str, password: str) -> bool:
         "username": username,
         "password": password,
     })
-    print(f"[DEBUG] Login POST final URL: {resp.url}")
+    print(f"[DEBUG] Login POST final URL: {resp.url}, status: {resp.status_code}")
+    print(f"[DEBUG] Session cookies after POST: {dict(session.cookies)}")
+    print(f"[DEBUG] POST 응답 앞부분: {resp.text[:300]}")
 
-    if "forLogin" in resp.url:
+    if "toLogin" in resp.url:
         return False
 
     # 마이페이지 메인을 먼저 방문해야 하위 페이지 접근 가능
