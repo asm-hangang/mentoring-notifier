@@ -56,6 +56,8 @@ def fetch_items(session: requests.Session) -> list[dict]:
             row["_no"] = int(row.get("NO.", "0"))
         except ValueError:
             continue
+        link = tr.find("a", href=True)
+        row["_url"] = BASE_URL + link["href"] if link else LIST_URL
         items.append(row)
 
     return items
@@ -65,12 +67,11 @@ def send_slack(webhook_url: str, new_items: list[dict]) -> None:
     lines = [f"*새로운 멘토링/특강 {len(new_items)}개 등록됨!*"]
     for item in new_items:
         lines.append(
-            f"• [{item.get('NO.', '')}] *{item.get('제목', '')}*\n"
+            f"• [{item.get('NO.', '')}] *<{item['_url']}|{item.get('제목', '')}>*\n"
             f"  📅 진행: {item.get('진행날짜', '')}\n"
             f"  ⏰ 접수: {item.get('접수기간', '')}\n"
-            f"  👥 모집인원: {item.get('모집인원', '')}  |  {item.get('상태', '')}"
+            f"  👥 모집인원: {item.get('모집인원', '')}  |  {item.get('상태', '')}  |  작성자: {item.get('작성자', '')}"
         )
-    lines.append(f"\n<{LIST_URL}|멘토링 목록 보기>")
     requests.post(webhook_url, json={"text": "\n".join(lines)}, timeout=10)
 
 
