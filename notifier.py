@@ -44,8 +44,8 @@ def login(session: requests.Session, username: str, password: str) -> bool:
     return True
 
 
-def fetch_items(session: requests.Session) -> list[dict]:
-    r = session.get(LIST_URL)
+def fetch_items(session: requests.Session, page_index: int = 1) -> list[dict]:
+    r = session.get(LIST_URL + f"&pageIndex={page_index}")
     soup = BeautifulSoup(r.text, "html.parser")
 
     target_table = None
@@ -141,31 +141,45 @@ def main() -> None:
     if not login(session, username, password):
         raise RuntimeError("Login failed — check SW_USERNAME / SW_PASSWORD")
 
-    items = fetch_items(session)
-    if not items:
+    first_page = fetch_items(session, page_index=1)
+    if not first_page:
         requests.post(webhook_url, json={"text": "[오류] 멘토링 목록 파싱 실패 — 로그를 확인하세요."}, timeout=10)
         return
 
     state = load_state()
 
-    # seen_ids 없으면 첫 실행 or 구버전 마이그레이션 → 현재 항목 저장 후 종료
+    # seen_ids 없으면 첫 실행 → 현재 항목 저장 후 종료
     if "seen_ids" not in state:
-        all_ids = [i["_id"] for i in items if i.get("_id")]
+        all_ids = [i["_id"] for i in first_page if i.get("_id")]
         save_state({"seen_ids": all_ids})
         print("초기화 완료 — 다음 실행부터 새 글 감지 시작")
         return
 
     seen_ids = set(state["seen_ids"])
-    new_items = [i for i in items if i.get("_id") and i["_id"] not in seen_ids]
+    all_new_items = []
+    all_fetched_ids = set()
 
-    if new_items:
-        send_slack(webhook_url, new_items)
-        print(f"Notified: {len(new_items)} new item(s)")
+    page = 1
+    while True:
+        items = fetch_items(session, page_index=page) if page > 1 else first_page
+        if not items:
+            break
+        all_fetched_ids.update(i["_id"] for i in items if i.get("_id"))
+        new_on_page = [i for i in items if i.get("_id") and i["_id"] not in seen_ids]
+        all_new_items.extend(new_on_page)
+        # 페이지 전체가 새 글이면 다음 페이지도 확인
+        if len(new_on_page) == len(items):
+            page += 1
+        else:
+            break
+
+    if all_new_items:
+        send_slack(webhook_url, all_new_items)
+        print(f"Notified: {len(all_new_items)} new item(s)")
     else:
         print("No new items")
 
-    # seen_ids 업데이트
-    updated_ids = list(seen_ids | {i["_id"] for i in items if i.get("_id")})
+    updated_ids = list(seen_ids | all_fetched_ids)
     save_state({"seen_ids": updated_ids})
 
 
