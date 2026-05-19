@@ -17,17 +17,21 @@ def login(session: requests.Session, username: str, password: str) -> bool:
     if not csrf_input:
         raise RuntimeError("CSRF token not found on login page")
 
-    session.post(LOGIN_POST, data={
+    resp = session.post(LOGIN_POST, data={
         "loginFlag": "",
         "menuNo": "200025",
         "csrfToken": csrf_input["value"],
         "username": username,
         "password": password,
     })
+    print(f"[DEBUG] Login POST final URL: {resp.url}")
 
-    # 로그인 성공 여부: 최종 URL이 로그인 페이지가 아니면 성공
-    check = session.get(LIST_URL)
-    return "forLogin" not in check.url
+    if "forLogin" in resp.url:
+        return False
+
+    # 마이페이지 메인을 먼저 방문해야 하위 페이지 접근 가능
+    session.get(f"{BASE_URL}/sw/mypage/myMain/main.do?menuNo=200026")
+    return True
 
 
 def fetch_items(session: requests.Session) -> list[dict]:
