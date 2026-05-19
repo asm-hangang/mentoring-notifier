@@ -34,7 +34,6 @@ def login(session: requests.Session, username: str, password: str) -> bool:
         action2 = BASE_URL + form2["action"]
         form_data = {i["name"]: i.get("value", "") for i in form2.find_all("input", {"type": "hidden"})}
         resp = session.post(action2, data=form_data)
-        print(f"[DEBUG] Step2 POST final URL: {resp.url}, status: {resp.status_code}")
 
     if "forLogin" in resp.url or "toLogin" in resp.url:
         return False
@@ -46,11 +45,8 @@ def login(session: requests.Session, username: str, password: str) -> bool:
 
 def fetch_items(session: requests.Session) -> list[dict]:
     r = session.get(LIST_URL)
-    print(f"[DEBUG] fetch URL: {r.url}, status: {r.status_code}, len: {len(r.text)}")
-    print(f"[DEBUG] HTML 앞부분: {r.text[:500]}")
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # 제목 컬럼이 있는 테이블을 찾음
     target_table = None
     for table in soup.find_all("table"):
         headers = [th.get_text(strip=True) for th in table.find_all("th")]
@@ -59,15 +55,9 @@ def fetch_items(session: requests.Session) -> list[dict]:
             break
 
     if not target_table:
-        all_headers = [
-            [th.get_text(strip=True) for th in t.find_all("th")]
-            for t in soup.find_all("table")
-        ]
-        print(f"[DEBUG] 테이블 헤더 목록: {all_headers}")
         return []
 
     headers = [th.get_text(strip=True) for th in target_table.find_all("th")]
-    print(f"[DEBUG] 파싱된 헤더: {headers}")
     items = []
     for tr in target_table.find_all("tr")[1:]:
         cells = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
@@ -125,7 +115,6 @@ def main() -> None:
         raise RuntimeError("Login failed — check SW_USERNAME / SW_PASSWORD")
 
     items = fetch_items(session)
-    print(f"[DEBUG] 파싱된 항목 수: {len(items)}")
     if not items:
         requests.post(webhook_url, json={"text": "[오류] 멘토링 목록 파싱 실패 — 로그를 확인하세요."}, timeout=10)
         return
