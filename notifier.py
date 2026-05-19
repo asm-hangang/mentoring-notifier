@@ -25,9 +25,9 @@ def login(session: requests.Session, username: str, password: str) -> bool:
         "password": password,
     })
 
-    # 로그인 성공 여부: 목록 페이지 접근 후 로그인 페이지로 리다이렉트되지 않으면 성공
-    check = session.get(LIST_URL, allow_redirects=False)
-    return check.status_code == 200
+    # 로그인 성공 여부: 최종 URL이 로그인 페이지가 아니면 성공
+    check = session.get(LIST_URL)
+    return "forLogin" not in check.url
 
 
 def fetch_items(session: requests.Session) -> list[dict]:
