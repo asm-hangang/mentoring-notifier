@@ -17,9 +17,6 @@ def login(session: requests.Session, username: str, password: str) -> bool:
     if not csrf_input:
         raise RuntimeError("CSRF token not found on login page")
 
-    print(f"[DEBUG] CSRF token: {csrf_input['value']}")
-    print(f"[DEBUG] Session cookies before POST: {dict(session.cookies)}")
-
     resp = session.post(LOGIN_POST, data={
         "loginFlag": "",
         "menuNo": "200025",
@@ -27,11 +24,19 @@ def login(session: requests.Session, username: str, password: str) -> bool:
         "username": username,
         "password": password,
     })
-    print(f"[DEBUG] Login POST final URL: {resp.url}, status: {resp.status_code}")
-    print(f"[DEBUG] Session cookies after POST: {dict(session.cookies)}")
-    print(f"[DEBUG] POST 응답 앞부분: {resp.text[:300]}")
 
+    # toLogin.do가 자동 제출 폼을 반환하면 /sw/login.do로 한 번 더 POST
     if "toLogin" in resp.url:
+        soup2 = BeautifulSoup(resp.text, "html.parser")
+        form2 = soup2.find("form")
+        if not form2:
+            return False
+        action2 = BASE_URL + form2["action"]
+        form_data = {i["name"]: i.get("value", "") for i in form2.find_all("input", {"type": "hidden"})}
+        resp = session.post(action2, data=form_data)
+        print(f"[DEBUG] Step2 POST final URL: {resp.url}, status: {resp.status_code}")
+
+    if "forLogin" in resp.url or "toLogin" in resp.url:
         return False
 
     # 마이페이지 메인을 먼저 방문해야 하위 페이지 접근 가능
