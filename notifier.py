@@ -162,7 +162,6 @@ def main() -> None:
         send_slack(webhook_url, new_items)
         print(f"Notified: {len(new_items)} new item(s)")
     else:
-        requests.post(webhook_url, json={"text": "새로운 멘토링/특강이 없습니다."}, timeout=10)
         print("No new items")
 
     # seen_ids 업데이트
