@@ -43,9 +43,15 @@ def fetch_items(session: requests.Session) -> list[dict]:
             break
 
     if not target_table:
+        all_headers = [
+            [th.get_text(strip=True) for th in t.find_all("th")]
+            for t in soup.find_all("table")
+        ]
+        print(f"[DEBUG] 테이블 헤더 목록: {all_headers}")
         return []
 
     headers = [th.get_text(strip=True) for th in target_table.find_all("th")]
+    print(f"[DEBUG] 파싱된 헤더: {headers}")
     items = []
     for tr in target_table.find_all("tr")[1:]:
         cells = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
@@ -103,8 +109,9 @@ def main() -> None:
         raise RuntimeError("Login failed — check SW_USERNAME / SW_PASSWORD")
 
     items = fetch_items(session)
+    print(f"[DEBUG] 파싱된 항목 수: {len(items)}")
     if not items:
-        print("No items found (parse error or empty list)")
+        requests.post(webhook_url, json={"text": "[오류] 멘토링 목록 파싱 실패 — 로그를 확인하세요."}, timeout=10)
         return
 
     state = load_state()
