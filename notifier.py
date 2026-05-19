@@ -1,7 +1,10 @@
 import os
 import json
+from datetime import datetime, timezone, timedelta
 import requests
 from bs4 import BeautifulSoup
+
+KST = timezone(timedelta(hours=9))
 
 BASE_URL = "https://www.swmaestro.ai"
 LOGIN_PAGE = f"{BASE_URL}/sw/member/user/forLogin.do?menuNo=200025"
@@ -100,6 +103,11 @@ def save_state(state: dict) -> None:
 
 
 def main() -> None:
+    now_kst = datetime.now(KST)
+    if 0 <= now_kst.hour < 7:
+        print(f"야간 시간대 건너뜀 (KST {now_kst.strftime('%H:%M')})")
+        return
+
     username = os.environ["SW_USERNAME"]
     password = os.environ["SW_PASSWORD"]
     webhook_url = os.environ["SLACK_WEBHOOK_URL"]
