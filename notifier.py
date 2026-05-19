@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import requests
 from bs4 import BeautifulSoup
 
@@ -59,15 +60,32 @@ def fetch_items(session: requests.Session) -> list[dict]:
 
     headers = [th.get_text(strip=True) for th in target_table.find_all("th")]
     items = []
-    for tr in target_table.find_all("tr")[1:]:
-        cells = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
+    for tr in target_table.find_all("tr"):
+        tds = tr.find_all("td")
+        if not tds:
+            continue  # th만 있는 헤더 행 건너뜀
+
+        cells = [re.sub(r'\s+', ' ', td.get_text()).strip() for td in tds]
         if len(cells) < len(headers):
             continue
-        row = dict(zip(headers, cells))
-        try:
-            row["_no"] = int(row.get("NO.", "0"))
-        except ValueError:
+
+        # 첫 번째 셀이 4자리 이상 숫자가 아니면 데이터 행이 아님
+        no_match = re.search(r'\d{4,}', cells[0])
+        if not no_match:
             continue
+
+        row = dict(zip(headers, cells))
+        row["_no"] = int(no_match.group())
+
+        # 제목: <a> 태그 텍스트만 사용 (모바일용 숨겨진 텍스트 제외)
+        try:
+            title_idx = headers.index("제목")
+            a_tag = tds[title_idx].find("a")
+            if a_tag:
+                row["제목"] = re.sub(r'\s+', ' ', a_tag.get_text()).strip()
+        except ValueError:
+            pass
+
         link = tr.find("a", href=True)
         row["_url"] = BASE_URL + link["href"] if link else LIST_URL
         items.append(row)
