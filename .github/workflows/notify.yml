@@ -24,7 +24,7 @@ jobs:
           SW_USERNAME: ${{ secrets.SW_USERNAME }}
           SW_PASSWORD: ${{ secrets.SW_PASSWORD }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: python notifier.py
+        run: python main.py
 
       - name: Commit updated state
         run: |

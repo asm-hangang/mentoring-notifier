@@ -1,0 +1,5 @@
+BASE_URL = "https://www.swmaestro.ai"
+LOGIN_PAGE = f"{BASE_URL}/sw/member/user/forLogin.do?menuNo=200025"
+LOGIN_POST = f"{BASE_URL}/sw/member/user/toLogin.do"
+LIST_URL = f"{BASE_URL}/sw/mypage/mentoLec/list.do?menuNo=200046&regDateOrder=desc"
+STATE_FILE = "last_seen.json"
