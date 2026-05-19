@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 BASE_URL = "https://www.swmaestro.ai"
 LOGIN_PAGE = f"{BASE_URL}/sw/member/user/forLogin.do?menuNo=200025"
 LOGIN_POST = f"{BASE_URL}/sw/member/user/toLogin.do"
-LIST_URL = f"{BASE_URL}/sw/mypage/mentoLec/list.do?menuNo=200046"
+LIST_URL = f"{BASE_URL}/sw/mypage/mentoLec/list.do?menuNo=200046&regDateOrder=desc"
 STATE_FILE = "last_seen.json"
 
 
@@ -70,12 +70,10 @@ def fetch_items(session: requests.Session) -> list[dict]:
             continue
 
         # 첫 번째 셀이 4자리 이상 숫자가 아니면 데이터 행이 아님
-        no_match = re.search(r'\d{4,}', cells[0])
-        if not no_match:
+        if not re.search(r'\d{4,}', cells[0]):
             continue
 
         row = dict(zip(headers, cells))
-        row["_no"] = int(no_match.group())
 
         # 제목: <a> 태그 텍스트만 사용 (모바일용 숨겨진 텍스트 제외)
         try:
@@ -86,8 +84,16 @@ def fetch_items(session: requests.Session) -> list[dict]:
         except ValueError:
             pass
 
+        # 상세 링크 및 고유 ID (qustnrSn)
         link = tr.find("a", href=True)
-        row["_url"] = BASE_URL + link["href"] if link else LIST_URL
+        if link:
+            row["_url"] = BASE_URL + link["href"]
+            sn_match = re.search(r'qustnrSn=(\d+)', link["href"])
+            row["_id"] = sn_match.group(1) if sn_match else None
+        else:
+            row["_url"] = LIST_URL
+            row["_id"] = None
+
         items.append(row)
 
     return items
@@ -97,7 +103,7 @@ def send_slack(webhook_url: str, new_items: list[dict]) -> None:
     lines = [f"*새로운 멘토링/특강 {len(new_items)}개 등록됨!*"]
     for item in new_items:
         lines.append(
-            f"• [{item.get('NO.', '')}] *<{item['_url']}|{item.get('제목', '')}>*\n"
+            f"• *<{item['_url']}|{item.get('제목', '')}>*\n"
             f"  📅 진행: {item.get('진행날짜', '')}\n"
             f"  ⏰ 접수: {item.get('접수기간', '')}\n"
             f"  👥 모집인원: {item.get('모집인원', '')}  |  {item.get('상태', '')}  |  작성자: {item.get('작성자', '')}"
@@ -109,7 +115,7 @@ def load_state() -> dict:
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE) as f:
             return json.load(f)
-    return {"last_no": 0}
+    return {}
 
 
 def save_state(state: dict) -> None:
@@ -138,9 +144,16 @@ def main() -> None:
         return
 
     state = load_state()
-    last_no = state["last_no"]
 
-    new_items = [i for i in items if i["_no"] > last_no]
+    # seen_ids 없으면 첫 실행 or 구버전 마이그레이션 → 현재 항목 저장 후 종료
+    if "seen_ids" not in state:
+        all_ids = [i["_id"] for i in items if i.get("_id")]
+        save_state({"seen_ids": all_ids})
+        print("초기화 완료 — 다음 실행부터 새 글 감지 시작")
+        return
+
+    seen_ids = set(state["seen_ids"])
+    new_items = [i for i in items if i.get("_id") and i["_id"] not in seen_ids]
 
     if new_items:
         send_slack(webhook_url, new_items)
@@ -149,10 +162,9 @@ def main() -> None:
         requests.post(webhook_url, json={"text": "새로운 멘토링/특강이 없습니다."}, timeout=10)
         print("No new items")
 
-    max_no = max(i["_no"] for i in items)
-    if max_no > last_no:
-        save_state({"last_no": max_no})
-        print(f"State updated: last_no={max_no}")
+    # seen_ids 업데이트
+    updated_ids = list(seen_ids | {i["_id"] for i in items if i.get("_id")})
+    save_state({"seen_ids": updated_ids})
 
 
 if __name__ == "__main__":
