@@ -64,9 +64,12 @@ def fetch_items(session: requests.Session) -> list[dict]:
 def send_slack(webhook_url: str, new_items: list[dict]) -> None:
     lines = [f"*새로운 멘토링/특강 {len(new_items)}개 등록됨!*"]
     for item in new_items:
-        status = item.get("상태", "")
-        date = item.get("진행날짜", "")
-        lines.append(f"• [{item['NO.']}] {item['제목']}  |  {date}  |  {status}")
+        lines.append(
+            f"• [{item.get('NO.', '')}] *{item.get('제목', '')}*\n"
+            f"  📅 진행: {item.get('진행날짜', '')}\n"
+            f"  ⏰ 접수: {item.get('접수기간', '')}\n"
+            f"  👥 모집인원: {item.get('모집인원', '')}  |  {item.get('상태', '')}"
+        )
     lines.append(f"\n<{LIST_URL}|멘토링 목록 보기>")
     requests.post(webhook_url, json={"text": "\n".join(lines)}, timeout=10)
 
